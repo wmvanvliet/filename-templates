@@ -6,7 +6,7 @@ them, which you can use to retrieve the full filename later:
 >>> fname = FileNames()
 >>> fname.add('my_file', '/path/to/file1')
 >>> fname.my_file
-'/path/to/file1'
+PosixPath('/path/to/file1')
 
 Filenames can also be templates that can be used to generate
 filenames for different subjects, conditions, etc.:
@@ -14,7 +14,7 @@ filenames for different subjects, conditions, etc.:
 >>> fname = FileNames()
 >>> fname.add('epochs', '/data/{subject}/{cond}-epo.fif')
 >>> fname.epochs(subject='sub001', cond='face')
-'/data/sub001/face-epo.fif'
+PosixPath('/data/sub001/face-epo.fif')
 
 Templates can contain placeholders in the way `string.format` allows,
 including formatting options:
@@ -22,7 +22,7 @@ including formatting options:
 >>> fname = FileNames()
 >>> fname.add('epochs', '/data/sub{subject:03d}/{cond}-epo.fif')
 >>> fname.epochs(subject=1, cond='face')
-'/data/sub001/face-epo.fif'
+PosixPath('/data/sub001/face-epo.fif')
 
 If a placeholder happens to be the alias of a file that has been added earlier,
 the placeholder is automatically filled:
@@ -31,7 +31,7 @@ the placeholder is automatically filled:
 >>> fname.add('subjects', '/data/subjects_dir')
 >>> fname.add('epochs', '{subjects}/{subject}/{cond}-epo.fif')
 >>> fname.epochs(subject='sub001', cond='face')
-'/data/subjects_dir/sub001/face-epo.fif'
+PosixPath('/data/subjects_dir/sub001/face-epo.fif')
 
 If all placeholders could be automatically filled, no brackets () are required
 when accessing it:
@@ -40,31 +40,71 @@ when accessing it:
 >>> fname.add('subjects', '/data/subjects_dir')
 >>> fname.add('fsaverage', '{subjects}/fsaverage-src.fif')
 >>> fname.fsaverage
-'/data/subjects_dir/fsaverage-src.fif'
+PosixPath('/data/subjects_dir/fsaverage-src.fif')
+
+The returned filenames are of type ``pathlib.Path``, which offers a bunch of
+convenience methods related to filenames that you wouldn't get with ordinary
+strings. They can be used in all locations were you would otherwise use a
+string filename. However, if you want an ordinary string, there are two ways of
+doing so. One is to cast the filename to a string:
+
+>>> fname = FileNames()
+>>> fname.add('my_file', '/path/to/file1')
+>>> str(fname.my_file)
+'/path/to/file1'
+
+If you want all of your filenames to be strings, always, then you can pass
+``as_str=True`` when creating the ``Filenames`` object:
+>>> fname = FileNames(as_str=True)
+>>> fname.add('my_file', '/path/to/file1')
+>>> str(fname.my_file)
+'/path/to/file1'
 
 If computing the file path gets more complicated than the cases above, you can
 supply your own function. When the filename is requested, your function will
 get called with the FileNames object as first parameter, followed by any
 parameters that were supplied along with the request:
 
+>>> from pathlib import Path
 >>> fname = FileNames()
 >>> fname.add('basedir', '/data/subjects_dir')
 >>> def my_function(files, subject):
 ...     if subject == 1:
-...         return files.basedir + '/103hdsolli.fif'
+...         return files.basedir / '103hdsolli.fif'
 ...     else:
-...         return files.basedir + '/%s.fif' % subject
+...         return files.basedir / f'{subject}.fif'
 >>> fname.add('complicated', my_function)
 >>> fname.complicated(subject=1)
-'/data/subjects_dir/103hdsolli.fif'
+PosixPath('/data/subjects_dir/103hdsolli.fif')
+
+Instead of adding one filename at a time, you can add a dictionary of them all
+at once:
+>>> fname = FileNames()
+>>> fname_dict = dict(
+...     subjects = '/data/subjects_dir',
+...     fsaverage = '{subjects}/fsaverage-src.fif',
+... )
+>>> fname.add_from_dict(fname_dict)
+>>> fname.fsaverage
+PosixPath('/data/subjects_dir/fsaverage-src.fif')
 
 Author: Marijn van Vliet <w.m.vanvliet@gmail.com>
 """
 import string
+from pathlib import Path
 
 
 class FileNames(object):
-    """Utility class to manage filenames."""
+    """Utility class to manage filenames.
+
+    See the help of the filenames python module for details.
+
+    Parameters
+    ----------
+    as_str : bool
+    """
+    def __init__(self, as_str:bool=False):
+        self.as_str = as_str
 
     def files(self):
         """Obtain a list of file aliases known to this FileNames object.
@@ -91,11 +131,15 @@ class FileNames(object):
             to retrieve the filename. Aliases can not start with '_' or a
             number.
         fname : str | function
-            The full filename. Either a string, with possible placeholder
-            values, or a function that will compute the filename. If you
+            The full filename. Either a string, optionally containing
+            placeholders, or a function that will compute the filename. If you
             specify a function, it will get called with the FileNames object as
             first parameter, followed by any parameters that were supplied
             along with the request.
+
+        See also
+        --------
+        add_from_dict
         """
         if callable(fname):
             self._add_function(alias, fname)
@@ -111,21 +155,41 @@ class FileNames(object):
                 if len(prefilled) == len(placeholders):
                     # The template could be completely pre-filled. Add the
                     # result as a plain string filename.
-                    self._add_fname(alias, fname.format(**prefilled))
+                    self._add_fname(alias, Path(fname.format(**prefilled)))
                 else:
                     # Add filename as a template
                     self._add_template(alias, fname)
 
+    def add_from_dict(self, fname_dict):
+        """Add all entries from an {alias: fname} dictionary.
+
+        Parameters
+        ----------
+        fname_fict : dict
+            A dictionary containing filename aliases as the keys and the full
+            filename as a value. Filenames can either be a string, optionally
+            containing placeholders, or a function. If the filename is a
+            function, it will get called with the FileNames object as first
+            parameter, followed by any parameters that were supplied along with
+            the request.
+
+        See also
+        --------
+        add
+        """
+        for alias, fname in fname_dict.items():
+            self.add(alias, fname)
+
     def _add_fname(self, alias, fname):
         """Add a filename that is a plain string."""
-        self.__dict__[alias] = fname
+        self.__dict__[alias] = fname if self.as_str else Path(fname)
 
     def _add_template(self, alias, template):
         """Add a filename that is a string containing placeholders."""
         # Construct a function that will do substitution for any placeholders
         # in the template.
         def fname(**kwargs):
-            return _substitute(template, self.files(), kwargs)
+            return Path(_substitute(template, self.files(), kwargs))
 
         # Bind the fname function to this instance of FileNames
         self.__dict__[alias] = fname
@@ -229,7 +293,7 @@ def _prefill_placeholders(placeholders, files, user_values):
         if placeholder in files:
             # Placeholder name is a filename, so get the path
             path = files[placeholder]
-            if not isinstance(path, str):
+            if not isinstance(path, Path):
                 try:
                     path = path(**user_values)
                 except ValueError:
