@@ -17,7 +17,7 @@ if __name__ == "__main__":
         version='1.0',
         download_url='https://github.com/wmvanvliet/filename-templates/archive/main.zip',
         long_description=codecs.open('README.md', encoding='utf8').read(),
-        long_description_content_type='text/x-rst',
+        long_description_content_type='text/markdown',
         classifiers=['Intended Audience :: Science/Research',
                      'Intended Audience :: Developers',
                      'License :: OSI Approved',
