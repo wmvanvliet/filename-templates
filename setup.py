@@ -15,7 +15,7 @@ if __name__ == "__main__":
         license='BSD-3',
         url='https://github.com/wmvanvliet/filenames',
         version='1.0',
-        download_url='https://github.com/wmvanvliet/filenames/archive/master.zip',
+        download_url='https://github.com/wmvanvliet/filenames/archive/main.zip',
         long_description=codecs.open('README.md', encoding='utf8').read(),
         classifiers=['Intended Audience :: Science/Research',
                      'Intended Audience :: Developers',
