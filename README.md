@@ -1,5 +1,5 @@
-filenames
-=========
+Filename Templates
+==================
 
 Make filenames from string templates.
 This package exposes the `FileNames` class, which keeps a list of filenames and provides a wrapper around `string.format` with some bells and whisles to make the syntax super nice.
@@ -11,7 +11,7 @@ Installation
 ------------
 either through pip:
 
-    pip install https://api.github.com/repos/wmvanvliet/filenames/zipball/main
+    pip install https://api.github.com/repos/wmvanvliet/filename-templates/zipball/main
 
 or from the repository:
 
@@ -29,6 +29,7 @@ Use the `add` method to add new filenames. You specify a short "alias" for
 them, which you can use to retrieve the full filename later:
 
 ```python
+>>> from filename_templates import FileNames
 >>> fname = FileNames()
 >>> fname.add('my_file', '/path/to/file1')
 >>> fname.my_file

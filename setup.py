@@ -8,14 +8,14 @@ if __name__ == "__main__":
         os.remove('MANIFEST')
 
     setup(
-        name='filenames',
+        name='filename-templates',
         maintainer='Marijn van Vliet',
         maintainer_email='w.m.vanvliet@gmail.com',
         description='Make filenames from string templates',
         license='BSD-3',
-        url='https://github.com/wmvanvliet/filenames',
+        url='https://github.com/wmvanvliet/filename-templates',
         version='1.0',
-        download_url='https://github.com/wmvanvliet/filenames/archive/main.zip',
+        download_url='https://github.com/wmvanvliet/filename-templates/archive/main.zip',
         long_description=codecs.open('README.md', encoding='utf8').read(),
         classifiers=['Intended Audience :: Science/Research',
                      'Intended Audience :: Developers',
@@ -28,6 +28,6 @@ if __name__ == "__main__":
                      'Operating System :: Unix',
                      'Operating System :: MacOS'],
         platforms='any',
-        packages=['filenames'],
+        packages=['filename_templates'],
         tests_require=['pytest'],
     )

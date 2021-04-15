@@ -3,6 +3,7 @@
 Use the `add` method to add new filenames. You specify a short "alias" for
 them, which you can use to retrieve the full filename later:
 
+>>> from filename_templates import FileNames
 >>> fname = FileNames()
 >>> fname.add('my_file', '/path/to/file1')
 >>> fname.my_file
