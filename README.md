@@ -11,7 +11,7 @@ Installation
 ------------
 either through pip:
 
-    pip install https://api.github.com/repos/wmvanvliet/filenames/zipball/master
+    pip install https://api.github.com/repos/wmvanvliet/filenames/zipball/main
 
 or from the repository:
 
