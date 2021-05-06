@@ -55,7 +55,7 @@ doing so. One is to cast the filename to a string:
 '/path/to/file1'
 
 If you want all of your filenames to be strings, always, then you can pass
-``as_str=True`` when creating the ``Filenames`` object:
+``as_str=True`` when creating the ``FileNames`` object:
 >>> fname = FileNames(as_str=True)
 >>> fname.add('my_file', '/path/to/file1')
 >>> fname.my_file

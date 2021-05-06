@@ -93,7 +93,7 @@ ways of doing so. One is to cast the filename to a string:
 ```
 
 If you want all of your filenames to be strings, always, then you can pass
-`as_str=True` when creating the `Filenames` object:
+`as_str=True` when creating the `FileNames` object:
 
 ```python
 >>> fname = FileNames(as_str=True)
