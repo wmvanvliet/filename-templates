@@ -6,6 +6,7 @@ This package exposes the `FileNames` class, which keeps a list of filenames and 
 
 I wrote this to keep track of filenames during data analysis projects, where there are many files, which names follow a standard pattern. For example: `data-day001.csv data-day002.csv data-day003.csv`. Processing these files may produce: `data-day001-processed.csv data-day002-processed.csv data-day003-processed.csv`. In these cases, it is good practice to define the templates for these filenames once, for example in a configuration file, and re-use them in the different analysis scripts.
 
+[![Video of the package in action](https://img.youtube.com/vi/OlxVhkuiGPU/2.jpg)](https://youtu.be/OlxVhkuiGPU?t=253)
 
 Installation
 ------------
