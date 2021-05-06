@@ -11,7 +11,7 @@ Installation
 ------------
 either through pip:
 
-    pip install https://api.github.com/repos/wmvanvliet/filename-templates/zipball/main
+    pip install filename-templates
 
 or from the repository:
 
