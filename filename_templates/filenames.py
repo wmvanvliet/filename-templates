@@ -58,7 +58,7 @@ If you want all of your filenames to be strings, always, then you can pass
 ``as_str=True`` when creating the ``Filenames`` object:
 >>> fname = FileNames(as_str=True)
 >>> fname.add('my_file', '/path/to/file1')
->>> str(fname.my_file)
+>>> fname.my_file
 '/path/to/file1'
 
 If computing the file path gets more complicated than the cases above, you can
