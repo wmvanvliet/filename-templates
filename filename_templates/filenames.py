@@ -136,6 +136,7 @@ class FileNames(object):
             public_attributes = ['files', 'add', 'as_str']
             if not name.startswith('_') and name not in public_attributes:
                 files[name] = value
+        files.update(self._with_mkdir)
         return files
 
     def add(self, alias, fname, mkdir=False):
