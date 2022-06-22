@@ -345,6 +345,8 @@ def _prefill_placeholders(placeholders, files, user_values):
                     # Placeholder could not be pre-filled given the supplied
                     # values by the user.
                     continue
+                except TypeError:
+                    continue
 
             # Add the path as possible placeholder value
             placeholder_values[placeholder] = path

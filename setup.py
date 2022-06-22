@@ -14,7 +14,7 @@ if __name__ == "__main__":
         description='Make filenames from string templates',
         license='BSD-3',
         url='https://github.com/wmvanvliet/filename-templates',
-        version='1.1.dev0',
+        version='1.1',
         download_url='https://github.com/wmvanvliet/filename-templates/archive/main.zip',
         long_description=codecs.open('README.md', encoding='utf8').read(),
         long_description_content_type='text/markdown',
