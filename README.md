@@ -131,29 +131,6 @@ parameters that were supplied along with the request:
 PosixPath('/data/subjects_dir/103hdsolli.fif')
 ```
 
-When defining functions, you are in complete control over what gets returned
-when a user requests a filename. It would be good style if you would check the
-`files.as_str` attribute to see if the user is requesting a plain string path
-and honor that request if possible.
-
-```python
->>> from pathlib import Path
->>> fname = FileNames(as_str=True)
->>> fname.add('basedir', '/data/subjects_dir')
->>> def my_function(files, subject):
-...     if subject == 1:
-...         fname =- files.basedir / '103hdsolli.fif'
-...     else:
-...         fname = files.basedir / f'{subject}.fif'
-...     if files.as_str:
-...         return str(fname)
-...     else:
-...         return fname
->>> fname.add('complicated', my_function)
->>> fname.complicated(subject=1)
-/data/subjects_dir/103hdsolli.fif'
-```
-
 Instead of adding one filename at a time, you can add a dictionary of them all
 at once:
 
