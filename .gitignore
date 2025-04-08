@@ -1,0 +1,4 @@
+dist
+.*.swp
+__pycache__
+filename_templates.egg-info

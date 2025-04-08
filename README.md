@@ -20,7 +20,7 @@ or from the repository:
 
 To run the tests:
 
-    python -m pytest --doctest-module
+    python -m pytest
 
 
 Usage
@@ -155,6 +155,18 @@ be created if it doesn't exist yet.
 >>> fname.add('my_file', 'path/to/file1', mkdir=True)
 >>> os.path.exists(fname.my_file.parent)
 True
+```
+
+The filenames object should be pickleable as long as you don't use custom functions to
+generate the filenames.
+
+```python
+>>> import pickle
+>>> fname = FileNames()
+>>> fname.add('normal_file', 'path/to/file1')
+>>> fname.add('template', 'path/to/{bla}')
+>>> len(pickle.dumps(fname))
+233
 ```
 
 Author

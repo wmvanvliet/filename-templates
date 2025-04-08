@@ -64,6 +64,7 @@ If you want all of your filenames to be strings, always, then you can pass
 Obviously this also works when the filename contains placeholders:
 >>> fname = FileNames(as_str=True)
 >>> fname.add('my_file', '/path/to/file{subject:d}')
+>>> fname.add('my_file', '/path/to/file{subject:d}')
 >>> fname.my_file(subject=1)
 '/path/to/file1'
 
@@ -104,8 +105,18 @@ be created if it doesn't exist yet.
 >>> os.path.exists(fname.my_file.parent)
 True
 
+The filenames object should be pickleable as long as you don't use custom functions to
+generate the filenames.
+>>> import pickle
+>>> fname = FileNames()
+>>> fname.add('normal_file', 'path/to/file1')
+>>> fname.add('template', 'path/to/{bla}')
+>>> len(pickle.dumps(fname))
+233
+
 Author: Marijn van Vliet <w.m.vanvliet@gmail.com>
 """
+
 import string
 from pathlib import Path
 
@@ -118,8 +129,10 @@ class FileNames(object):
     Parameters
     ----------
     as_str : bool
+
     """
-    def __init__(self, as_str:bool=False):
+
+    def __init__(self, as_str: bool = False):
         self.as_str = as_str
         self._with_mkdir = dict()
 
@@ -130,11 +143,12 @@ class FileNames(object):
         -------
         files : list of str
             The list of file aliases.
+
         """
         files = dict()
         for name, value in self.__dict__.items():
-            public_attributes = ['files', 'add', 'as_str']
-            if not name.startswith('_') and name not in public_attributes:
+            public_attributes = ["files", "add", "as_str"]
+            if not name.startswith("_") and name not in public_attributes:
                 files[name] = value
         files.update(self._with_mkdir)
         return files
@@ -158,9 +172,10 @@ class FileNames(object):
             Create the parent directory, if it doesn't already exist, for this
             file whenever this filename is accessed.
 
-        See also
+        See Also
         --------
         add_from_dict
+
         """
         if callable(fname):
             self._add_function(alias, fname, mkdir)
@@ -171,13 +186,11 @@ class FileNames(object):
             if len(placeholders) == 0:
                 self._add_fname(alias, fname, mkdir)  # Plain string filename
             else:
-                prefilled = _prefill_placeholders(placeholders, self.files(),
-                                                  dict())
+                prefilled = _prefill_placeholders(placeholders, self.files(), dict())
                 if len(prefilled) == len(placeholders):
                     # The template could be completely pre-filled. Add the
                     # result as a plain string filename.
-                    self._add_fname(alias, Path(fname.format(**prefilled)),
-                                    mkdir)
+                    self._add_fname(alias, Path(fname.format(**prefilled)), mkdir)
                 else:
                     # Add filename as a template
                     self._add_template(alias, fname, mkdir)
@@ -187,7 +200,7 @@ class FileNames(object):
 
         Parameters
         ----------
-        fname_fict : dict
+        fname_dict : dict
             A dictionary containing filename aliases as the keys and the full
             filename as a value. Filenames can either be a string, optionally
             containing placeholders, or a function. If the filename is a
@@ -198,9 +211,10 @@ class FileNames(object):
             Create the parent directory, if it doesn't already exist, for the
             file whenever one of these filenames is accessed.
 
-        See also
+        See Also
         --------
         add
+
         """
         for alias, fname in fname_dict.items():
             self.add(alias, fname, mkdir)
@@ -218,17 +232,14 @@ class FileNames(object):
         """Add a filename that is a string containing placeholders."""
         # Construct a function that will do substitution for any placeholders
         # in the template.
-        def fname(**kwargs):
-            fname = Path(_substitute(template, self.files(), kwargs))
-            if mkdir:
-                fname.parent.mkdir(parents=True, exist_ok=True)
-            return str(fname) if self.as_str else fname
+        fname = _Template(template, self.files(), self.as_str, mkdir)
 
         # Bind the fname function to this instance of FileNames
         self.__dict__[alias] = fname
 
     def _add_function(self, alias, func, mkdir=False):
         """Add a filename that is computed using a user-specified function."""
+
         # Construct a function that will call the user supplied function with
         # the proper arguments. We prepend 'self' so the user supplied function
         # has easy access to all the filepaths.
@@ -243,12 +254,17 @@ class FileNames(object):
 
     def __getattr__(self, name):
         """Check whether to do mkdir when accessing plain Path/string."""
-        if name in self._with_mkdir:
-            fname = self._with_mkdir[name]
-            Path(fname).parent.mkdir(parents=True, exist_ok=True)
-            return fname
-        else:
-            raise AttributeError(f'Unknown filename: {name}')
+        # We need to wrap this in a try/except block because joblib pickling does
+        # something weird with __getattr__ that may fail.
+        try:
+            if name in self._with_mkdir:
+                fname = self._with_mkdir[name]
+                Path(fname).parent.mkdir(parents=True, exist_ok=True)
+                return fname
+            else:
+                raise AttributeError(f"Unknown filename: {name}")
+        except:  # noqa
+            return super().__getattr__(name)
 
 
 def _get_placeholders(template):
@@ -263,54 +279,13 @@ def _get_placeholders(template):
     -------
     placeholders : list of str
         The list of placeholder names that were found in the template string.
+
     """
-    return [p[1] for p in string.Formatter().parse(template)
-            if p[1] is not None and len(p[1]) > 0]
-
-
-def _substitute(template, files, user_values):
-    """Makes a filename from a template.
-
-    Any placeholders that point to known file aliases will be prefilled. The
-    rest is filled given the values provided by the user when requesting the
-    filename.
-
-    Parameters
-    ----------
-    template : str
-        The template string for the filename.
-    files : list of str
-        A list of file aliases that are already known.
-    user_values : dict
-        The key=value parameters that the user specified when requesting the
-        filename.
-
-    Returns
-    -------
-    filename : str
-        The filename, obtained by filling all the placeholders of the template
-        string.
-    """
-    # Get all placeholder names
-    placeholders = _get_placeholders(template)
-
-    # Pre-fill placeholders based on existing file aliases
-    placeholder_values = _prefill_placeholders(placeholders, files,
-                                               user_values)
-
-    # Add user specified values for the placeholders
-    placeholder_values.update(**user_values)
-
-    # Check whether all placeholder values are now properly provided.
-    provided = set(placeholder_values.keys())
-    needed = set(placeholders)
-    missing = needed - provided
-    if len(missing) > 0:
-        raise ValueError('Cannot construct filename, because the following '
-                         'parameters are missing: %s' % missing)
-
-    # Do the substitution
-    return template.format(**placeholder_values)
+    return [
+        p[1]
+        for p in string.Formatter().parse(template)
+        if p[1] is not None and len(p[1]) > 0
+    ]
 
 
 def _prefill_placeholders(placeholders, files, user_values):
@@ -331,6 +306,7 @@ def _prefill_placeholders(placeholders, files, user_values):
     placeholder_values : dict
         A dictionary containing the values for the placeholders that could be
         pre-filled.
+
     """
     placeholder_values = dict()
 
@@ -352,3 +328,59 @@ def _prefill_placeholders(placeholders, files, user_values):
             placeholder_values[placeholder] = path
 
     return placeholder_values
+
+
+class _Template:
+    """Function that performs variable substitution  returns the file path."""
+
+    def __init__(self, template, files, as_str, mkdir):
+        self.template = template
+        self.files = files
+        self.as_str = as_str
+        self.mkdir = mkdir
+
+    def __call__(self, **kwargs):
+        """Make a filename from a template.
+
+        Any placeholders that point to known file aliases will be prefilled. The
+        rest is filled given the values provided by the user when requesting the
+        filename.
+
+        Parameters
+        ----------
+        kwargs : dict
+            The key=value parameters that the user specified when requesting the
+            filename.
+
+        Returns
+        -------
+        filename : str
+            The filename, obtained by filling all the placeholders of the template
+            string.
+
+        """
+        # Get all placeholder names
+        placeholders = _get_placeholders(self.template)
+
+        # Pre-fill placeholders based on existing file aliases
+        placeholder_values = _prefill_placeholders(placeholders, self.files, kwargs)
+
+        # Add user specified values for the placeholders
+        placeholder_values.update(**kwargs)
+
+        # Check whether all placeholder values are now properly provided.
+        provided = set(placeholder_values.keys())
+        needed = set(placeholders)
+        missing = needed - provided
+        if len(missing) > 0:
+            raise ValueError(
+                "Cannot construct filename, because the following "
+                "parameters are missing: %s" % missing
+            )
+
+        # Do the substitution
+        fname = Path(self.template.format(**placeholder_values))
+
+        if self.mkdir:
+            fname.parent.mkdir(parents=True, exist_ok=True)
+        return str(fname) if self.as_str else fname
