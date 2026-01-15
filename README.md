@@ -83,13 +83,22 @@ The returned filenames are of type
 [`pathlib.Path`](https://docs.python.org/3/library/pathlib.html), which offers
 a bunch of convenience methods related to filenames that you wouldn't get with
 ordinary strings. They can be used in all locations were you would otherwise
-use a string filename. However, if you want an ordinary string, there are two
+use a string filename. However, if you want an ordinary string, there are several
 ways of doing so. One is to cast the filename to a string:
 
 ```python
 >>> fname = FileNames()
 >>> fname.add('my_file', '/path/to/file1')
 >>> str(fname.my_file)
+'/path/to/file1'
+```
+
+Another way is to, when adding a filename, to specify that the filename should always be
+returned as string:
+```python
+>>> fname = FileNames()
+>>> fname.add('my_file', '/path/to/file1', as_str=True)
+>>> fname.my_file
 '/path/to/file1'
 ```
 

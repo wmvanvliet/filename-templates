@@ -46,12 +46,19 @@ PosixPath('/data/subjects_dir/fsaverage-src.fif')
 The returned filenames are of type ``pathlib.Path``, which offers a bunch of
 convenience methods related to filenames that you wouldn't get with ordinary
 strings. They can be used in all locations were you would otherwise use a
-string filename. However, if you want an ordinary string, there are two ways of
+string filename. However, if you want an ordinary string, there are several ways of
 doing so. One is to cast the filename to a string:
 
 >>> fname = FileNames()
 >>> fname.add('my_file', '/path/to/file1')
 >>> str(fname.my_file)
+'/path/to/file1'
+
+Another way is to, when adding a filename, to specify that the filename should always be
+returned as string:
+>>> fname = FileNames()
+>>> fname.add('my_file', '/path/to/file1', as_str=True)
+>>> fname.my_file
 '/path/to/file1'
 
 If you want all of your filenames to be strings, always, then you can pass
@@ -153,7 +160,7 @@ class FileNames(object):
         files.update(self._with_mkdir)
         return files
 
-    def add(self, alias, fname, mkdir=False):
+    def add(self, alias, fname, mkdir=False, as_str=False):
         """Add a new filename.
 
         Parameters
@@ -171,6 +178,8 @@ class FileNames(object):
         mkdir : bool
             Create the parent directory, if it doesn't already exist, for this
             file whenever this filename is accessed.
+        as_str : bool
+            Whether to return the filename as a string or as a pathlib.Path object.
 
         See Also
         --------
@@ -178,24 +187,26 @@ class FileNames(object):
 
         """
         if callable(fname):
-            self._add_function(alias, fname, mkdir)
+            self._add_function(alias, fname, mkdir, as_str)
         else:
             # Determine whether the string contains placeholders and whether
             # all placeholders can be pre-filled with existing file aliases.
             placeholders = _get_placeholders(fname)
             if len(placeholders) == 0:
-                self._add_fname(alias, fname, mkdir)  # Plain string filename
+                self._add_fname(alias, fname, mkdir, as_str)  # Plain string filename
             else:
                 prefilled = _prefill_placeholders(placeholders, self.files(), dict())
                 if len(prefilled) == len(placeholders):
                     # The template could be completely pre-filled. Add the
                     # result as a plain string filename.
-                    self._add_fname(alias, Path(fname.format(**prefilled)), mkdir)
+                    self._add_fname(
+                        alias, Path(fname.format(**prefilled)), mkdir, as_str
+                    )
                 else:
                     # Add filename as a template
-                    self._add_template(alias, fname, mkdir)
+                    self._add_template(alias, fname, mkdir, as_str)
 
-    def add_from_dict(self, fname_dict, mkdir=False):
+    def add_from_dict(self, fname_dict, mkdir=False, as_str=False):
         """Add all entries from an {alias: fname} dictionary.
 
         Parameters
@@ -210,6 +221,8 @@ class FileNames(object):
         mkdir : bool
             Create the parent directory, if it doesn't already exist, for the
             file whenever one of these filenames is accessed.
+        as_str : bool
+            Whether to return the filename as a string or as a pathlib.Path object.
 
         See Also
         --------
@@ -217,27 +230,27 @@ class FileNames(object):
 
         """
         for alias, fname in fname_dict.items():
-            self.add(alias, fname, mkdir)
+            self.add(alias, fname, mkdir, as_str)
 
-    def _add_fname(self, alias, fname, mkdir=False):
+    def _add_fname(self, alias, fname, mkdir=False, as_str=False):
         """Add a filename that is a plain string."""
-        if not self.as_str:
+        if not as_str and not self.as_str:
             fname = Path(fname)
         if mkdir:
             self._with_mkdir[alias] = fname
         else:
             self.__dict__[alias] = fname
 
-    def _add_template(self, alias, template, mkdir=False):
+    def _add_template(self, alias, template, mkdir=False, as_str=False):
         """Add a filename that is a string containing placeholders."""
         # Construct a function that will do substitution for any placeholders
         # in the template.
-        fname = _Template(template, self.files(), self.as_str, mkdir)
+        fname = _Template(template, self.files(), as_str or self.as_str, mkdir)
 
         # Bind the fname function to this instance of FileNames
         self.__dict__[alias] = fname
 
-    def _add_function(self, alias, func, mkdir=False):
+    def _add_function(self, alias, func, mkdir=False, as_str=False):
         """Add a filename that is computed using a user-specified function."""
 
         # Construct a function that will call the user supplied function with
@@ -247,7 +260,7 @@ class FileNames(object):
             fname = func(self, **kwargs)
             if mkdir:
                 Path(str(fname)).parent.mkdir(parents=True, exist_ok=True)
-            return str(fname) if self.as_str else fname
+            return str(fname) if (as_str or self.as_str) else fname
 
         # Bind the fname function to this instance of FileNames
         self.__dict__[alias] = fname
@@ -314,7 +327,7 @@ def _prefill_placeholders(placeholders, files, user_values):
         if placeholder in files:
             # Placeholder name is a filename, so get the path
             path = files[placeholder]
-            if not isinstance(path, Path):
+            if not isinstance(path, (str, Path)):
                 try:
                     path = path(**user_values)
                 except ValueError:
@@ -379,8 +392,11 @@ class _Template:
             )
 
         # Do the substitution
-        fname = Path(self.template.format(**placeholder_values))
-
-        if self.mkdir:
-            fname.parent.mkdir(parents=True, exist_ok=True)
-        return str(fname) if self.as_str else fname
+        fname = self.template.format(**placeholder_values)
+        if not self.as_str:
+            fname = Path(fname)
+            if self.mkdir:
+                fname.parent.mkdir(parents=True, exist_ok=True)
+        elif self.mkdir:
+            Path(fname).parent.mkdir(parents=True, exist_ok=True)
+        return fname
