@@ -28,7 +28,6 @@ Usage
 
 Use the `add` method to add new filenames. You specify a short "alias" for
 them, which you can use to retrieve the full filename later:
-
 ```python
 >>> from filename_templates import FileNames
 >>> fname = FileNames()
@@ -39,7 +38,6 @@ PosixPath('/path/to/file1')
 
 Filenames can also be templates that can be used to generate
 filenames for different subjects, conditions, etc.:
-
 ```python
 >>> fname = FileNames()
 >>> fname.add('epochs', '/data/{subject}/{cond}-epo.fif')
@@ -49,7 +47,6 @@ PosixPath('/data/sub001/face-epo.fif')
 
 Templates can contain placeholders in the way `string.format` allows,
 including formatting options:
-
 ```python
 >>> fname = FileNames()
 >>> fname.add('epochs', '/data/sub{subject:03d}/{cond}-epo.fif')
@@ -59,7 +56,6 @@ PosixPath('/data/sub001/face-epo.fif')
 
 If a placeholder happens to be the alias of a file that has been added earlier,
 the placeholder is automatically filled:
-
 ```python
 >>> fname = FileNames()
 >>> fname.add('subjects', '/data/subjects_dir')
@@ -70,7 +66,6 @@ PosixPath('/data/subjects_dir/sub001/face-epo.fif')
 
 If all placeholders could be automatically filled, no brackets () are required
 when accessing it:
-
 ```python
 >>> fname = FileNames()
 >>> fname.add('subjects', '/data/subjects_dir')
@@ -79,13 +74,89 @@ when accessing it:
 PosixPath('/data/subjects_dir/fsaverage-src.fif')
 ```
 
-The returned filenames are of type
-[`pathlib.Path`](https://docs.python.org/3/library/pathlib.html), which offers
-a bunch of convenience methods related to filenames that you wouldn't get with
-ordinary strings. They can be used in all locations were you would otherwise
-use a string filename. However, if you want an ordinary string, there are several
-ways of doing so. One is to cast the filename to a string:
+When declaring filenames, you can tag them with `mkdir=True`. Whenever a
+filename that is tagged in this manner is accessed, the parent directory will
+be created if it doesn't exist yet.
+```python
+>>> import os.path
+>>> fname = FileNames()
+>>> fname.add('my_file', 'path/to/file1', mkdir=True)
+>>> os.path.exists(fname.my_file.parent)
+True
+```
 
+If computing the file path gets more complicated than the cases above, you can
+supply your own function. When the filename is requested, your function will
+get called with the FileNames object as first parameter, followed by any
+parameters that were supplied along with the request:
+```python
+>>> from pathlib import Path
+>>> fname = FileNames()
+>>> fname.add('basedir', '/data/subjects_dir')
+>>> def my_function(files, subject):
+...     if subject == 1:
+...         return files.basedir / '103hdsolli.fif'
+...     else:
+...         return files.basedir / f'{subject}.fif'
+>>> fname.add('complicated', my_function)
+>>> fname.complicated(subject=1)
+PosixPath('/data/subjects_dir/103hdsolli.fif')
+```
+
+When many of your filenames contain the same placeholders, it may be convenient to
+pre-fill the placeholder once with `fname.fill_placeholder(placeholder=value)`, after
+which it will be automatically filled in the future:
+```python
+>>> fname = FileNames()
+>>> fname.add('epochs', 'sub-{subject:02d}_ses-{session:02d}_{cond}-epo.fif')
+>>> fname.add('evoked', 'sub-{subject:02d}_ses-{session:02d}_{cond}-ave.fif')
+>>> fname.fill_placeholder('subject', 1)
+>>> fname.fill_placeholder('session', 2)
+>>> fname.evoked(cond='visual')
+PosixPath('sub-01_ses-02_visual-ave.fif')
+```
+
+Pre-filled placeholders can still be overwritten by manually specifying them when using
+a filename:
+```python
+>>> fname = FileNames()
+>>> fname.add('epochs', 'sub-{subject:02d}-epo.fif')
+>>> fname.fill_placeholder('subject', 1)
+>>> fname.epochs(subject=2)
+PosixPath('sub-02-epo.fif')
+```
+
+You can undo filling in placeholders using `fname.clear_placeholder(placeholder)`, after
+which it will again need to be filled in manually when using the filename.
+```python
+>>> fname = FileNames()
+>>> fname.add('epochs', 'sub-{subject:02d}-epo.fif')
+>>> fname.fill_placeholder('subject', 1)
+>>> fname.clear_placeholder('subject')
+>>> fname.epochs()
+Traceback (most recent call last):
+   ...
+ValueError: Cannot construct filename, because these parameters are missing: {'subject'}
+```
+
+Instead of adding one filename at a time, you can add a dictionary of them all
+at once:
+```python
+>>> fname = FileNames()
+>>> fname_dict = dict(
+...     subjects = '/data/subjects_dir',
+...     fsaverage = '{subjects}/fsaverage-src.fif',
+... )
+>>> fname.add_from_dict(fname_dict)
+>>> fname.fsaverage
+PosixPath('/data/subjects_dir/fsaverage-src.fif')
+```
+
+The returned filenames are of type `pathlib.Path`, which offers a bunch of
+convenience methods related to filenames that you wouldn't get with ordinary
+strings. They can be used in all locations were you would otherwise use a
+string filename. However, if you want an ordinary string, there are several ways of
+doing so. One is to cast the filename to a string:
 ```python
 >>> fname = FileNames()
 >>> fname.add('my_file', '/path/to/file1')
@@ -104,7 +175,6 @@ returned as string:
 
 If you want all of your filenames to be strings, always, then you can pass
 `as_str=True` when creating the `FileNames` object:
-
 ```python
 >>> fname = FileNames(as_str=True)
 >>> fname.add('my_file', '/path/to/file1')
@@ -113,69 +183,23 @@ If you want all of your filenames to be strings, always, then you can pass
 ```
 
 Obviously this also works when the filename contains placeholders:
-
 ```python
 >>> fname = FileNames(as_str=True)
+>>> fname.add('my_file', '/path/to/file{subject:d}')
 >>> fname.add('my_file', '/path/to/file{subject:d}')
 >>> fname.my_file(subject=1)
 '/path/to/file1'
 ```
 
-If computing the file path gets more complicated than the cases above, you can
-supply your own function. When the filename is requested, your function will
-get called with the FileNames object as first parameter, followed by any
-parameters that were supplied along with the request:
-
-```python
->>> from pathlib import Path
->>> fname = FileNames()
->>> fname.add('basedir', '/data/subjects_dir')
->>> def my_function(files, subject):
-...     if subject == 1:
-...         return files.basedir / '103hdsolli.fif'
-...     else:
-...         return files.basedir / f'{subject}.fif'
->>> fname.add('complicated', my_function)
->>> fname.complicated(subject=1)
-PosixPath('/data/subjects_dir/103hdsolli.fif')
-```
-
-Instead of adding one filename at a time, you can add a dictionary of them all
-at once:
-
-```python
->>> fname = FileNames()
->>> fname_dict = dict(
-...     subjects = '/data/subjects_dir',
-...     fsaverage = '{subjects}/fsaverage-src.fif',
-... )
->>> fname.add_from_dict(fname_dict)
->>> fname.fsaverage
-PosixPath('/data/subjects_dir/fsaverage-src.fif')
-```
-
-When declaring filenames, you can tag them with `mkdir=True`. Whenever a
-filename that is tagged in this manner is accessed, the parent directory will
-be created if it doesn't exist yet.
-
-```python
->>> import os.path
->>> fname = FileNames()
->>> fname.add('my_file', 'path/to/file1', mkdir=True)
->>> os.path.exists(fname.my_file.parent)
-True
-```
-
 The filenames object should be pickleable as long as you don't use custom functions to
-generate the filenames.
-
+generate the filenames:
 ```python
 >>> import pickle
 >>> fname = FileNames()
 >>> fname.add('normal_file', 'path/to/file1')
 >>> fname.add('template', 'path/to/{bla}')
 >>> len(pickle.dumps(fname))
-233
+267
 ```
 
 Author
