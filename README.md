@@ -16,11 +16,11 @@ either through pip:
 
 or from the repository:
 
-    python setup.py install
+    pip install .
 
-To run the tests:
+To run the tests, install the [`pytest`](https://pytest.org) package first, and then:
 
-    python -m pytest
+    pytest
 
 
 Usage
