@@ -147,9 +147,9 @@ generate the filenames:
 Author: Marijn van Vliet <w.m.vanvliet@gmail.com>
 """
 
+import difflib
 import string
 from pathlib import Path
-import difflib
 
 
 class FileNames(object):
@@ -165,6 +165,7 @@ class FileNames(object):
 
     def __init__(self, as_str: bool = False):
         self.as_str = as_str
+        self._files = dict()
         self._with_mkdir = dict()
         self._pre_filled = dict()
 
@@ -177,13 +178,7 @@ class FileNames(object):
             The list of file aliases.
 
         """
-        files = dict()
-        for name, value in self.__dict__.items():
-            public_attributes = ["files", "add", "as_str"]
-            if not name.startswith("_") and name not in public_attributes:
-                files[name] = value
-        files.update(self._with_mkdir)
-        return files
+        return sorted(list(self._files.keys()) + list(self._with_mkdir.keys()))
 
     def add(self, alias, fname, mkdir=False, as_str=False):
         """Add a new filename.
@@ -296,7 +291,7 @@ class FileNames(object):
         if mkdir:
             self._with_mkdir[alias] = fname
         else:
-            self.__dict__[alias] = fname
+            self._files[alias] = fname
 
     def _add_template(self, alias, template, mkdir=False, as_str=False):
         """Add a filename that is a string containing placeholders."""
@@ -307,7 +302,7 @@ class FileNames(object):
         )
 
         # Bind the fname function to this instance of FileNames
-        self.__dict__[alias] = fname
+        self._files[alias] = fname
 
     def _add_function(self, alias, func, mkdir=False, as_str=False):
         """Add a filename that is computed using a user-specified function."""
@@ -322,28 +317,28 @@ class FileNames(object):
             return str(fname) if (as_str or self.as_str) else fname
 
         # Bind the fname function to this instance of FileNames
-        self.__dict__[alias] = fname
+        self._files[alias] = fname
 
     def __getattr__(self, name):
         """Check whether to do mkdir when accessing plain Path/string."""
         # We need to wrap this in a try/except block because joblib pickling does
         # something weird with __getattr__ that may fail.
-        try:
-            if name in self._with_mkdir:
-                fname = self._with_mkdir[name]
-                Path(fname).parent.mkdir(parents=True, exist_ok=True)
-                return fname
-            else:
-                raise AttributeError()
-        except:  # noqa
-            try:
-                return super().__getattr__(name)
-            except AttributeError:
-                msg = f"Unknown filename: '{name}'"
-                matches = difflib.get_close_matches(name, self.files(), 1)
-                if len(matches) == 1:
-                    msg += f" (did you mean '{matches[0]}'?)"
-                raise AttributeError(msg)
+        if name in self._files:
+            fname = self._files[name]
+        elif name in self._with_mkdir:
+            fname = self._with_mkdir[name]
+            Path(fname).parent.mkdir(parents=True, exist_ok=True)
+        else:
+            msg = f"Unknown filename: '{name}'"
+            matches = difflib.get_close_matches(name, self.files(), 1)
+            if len(matches) == 1:
+                msg += f" (did you mean '{matches[0]}'?)"
+            raise AttributeError(msg)
+
+        if isinstance(fname, _Template) and fname._all_placeholders_prefilled():
+            fname = fname()
+
+        return fname
 
 
 def _get_placeholders(template):
@@ -470,3 +465,20 @@ class _Template:
         elif self.mkdir:
             Path(fname).parent.mkdir(parents=True, exist_ok=True)
         return fname
+
+    def _all_placeholders_prefilled(self):
+        """Check if all placeholders can be pre-filled."""
+        # Get all placeholder names
+        placeholders = _get_placeholders(self.template)
+
+        # Pre-fill placeholders based on existing file aliases
+        placeholder_values = _prefill_placeholders(placeholders, self.files, {})
+
+        # Pre-fill placeholders based on explicitly pre-filled values
+        placeholder_values.update(**self.pre_filled)
+
+        # Check whether all placeholder values are now properly provided.
+        provided = set(placeholder_values.keys())
+        needed = set(placeholders)
+        missing = needed - provided
+        return len(missing) == 0
