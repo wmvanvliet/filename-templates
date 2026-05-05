@@ -178,7 +178,7 @@ class FileNames(object):
             The list of file aliases.
 
         """
-        return sorted(self._files.keys())
+        return sorted(list(self._files.keys()) + list(self._with_mkdir.keys()))
 
     def add(self, alias, fname, mkdir=False, as_str=False):
         """Add a new filename.
@@ -215,7 +215,7 @@ class FileNames(object):
             if len(placeholders) == 0:
                 self._add_fname(alias, fname, mkdir, as_str)  # Plain string filename
             else:
-                prefilled = _prefill_placeholders(placeholders, self._files, dict())
+                prefilled = _prefill_placeholders(placeholders, self.files(), dict())
                 if len(prefilled) == len(placeholders):
                     # The template could be completely pre-filled. Add the
                     # result as a plain string filename.
@@ -290,14 +290,15 @@ class FileNames(object):
             fname = Path(fname)
         if mkdir:
             self._with_mkdir[alias] = fname
-        self._files[alias] = fname
+        else:
+            self._files[alias] = fname
 
     def _add_template(self, alias, template, mkdir=False, as_str=False):
         """Add a filename that is a string containing placeholders."""
         # Construct a function that will do substitution for any placeholders
         # in the template.
         fname = _Template(
-            template, self._pre_filled, self._files, as_str or self.as_str, mkdir
+            template, self._pre_filled, self.files(), as_str or self.as_str, mkdir
         )
 
         # Bind the fname function to this instance of FileNames
@@ -324,6 +325,9 @@ class FileNames(object):
         # something weird with __getattr__ that may fail.
         if name in self._files:
             fname = self._files[name]
+        elif name in self._with_mkdir:
+            fname = self._with_mkdir[name]
+            Path(fname).parent.mkdir(parents=True, exist_ok=True)
         else:
             msg = f"Unknown filename: '{name}'"
             matches = difflib.get_close_matches(name, self.files(), 1)
@@ -333,9 +337,6 @@ class FileNames(object):
 
         if isinstance(fname, _Template) and fname._all_placeholders_prefilled():
             fname = fname()
-
-        if name in self._with_mkdir:
-            self._with_mkdir[name].parent.mkdir(parents=True, exist_ok=True)
 
         return fname
 
